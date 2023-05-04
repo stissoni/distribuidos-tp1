@@ -1,0 +1,1 @@
+docker logs -f --tail 50 %1

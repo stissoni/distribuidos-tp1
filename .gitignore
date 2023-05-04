@@ -1,0 +1,5 @@
+# Ignore __pycache__ directories
+global-exclude __pycache__
+
+# Ignore ./client/data
+prune client/datagity
