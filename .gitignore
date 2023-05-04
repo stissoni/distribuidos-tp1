@@ -2,4 +2,4 @@
 global-exclude __pycache__
 
 # Ignore ./client/data
-prune client/datagity
+prune client/data
