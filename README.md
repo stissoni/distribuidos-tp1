@@ -1,6 +1,6 @@
 ## Instrucciones
 
-Pegar el archivo de datos data.zip en ./cliente/data
+Pegar el archivo de datos data.zip en client/data/data.zip
 
 Luego ejecutar:
 
