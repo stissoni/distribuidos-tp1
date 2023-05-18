@@ -1,9 +1,13 @@
 import logging
+import os
+
+RAINY_FILTER_REPLICAS = os.getenv("RAINY_FILTER_REPLICAS", 1)
 
 
 class DurationAverages:
     def __init__(self) -> None:
         self.logger = logging.getLogger("rainy_durations_avg")
+        self.total_end_streams = 0
         self.rain = {}
 
     def calculate_avg(self):
@@ -19,8 +23,11 @@ class DurationAverages:
         fields = message.split(",")
         if "end_stream" in fields[0]:
             self.logger.info("Message contains end_stream")
+            self.total_end_streams += 1
+            if self.total_end_streams == int(RAINY_FILTER_REPLICAS):
+                self.logger.info("All replicas have sent end_stream")
+                ch.stop_consuming()
             ch.basic_ack(delivery_tag=method.delivery_tag)
-            ch.stop_consuming()
             return
         else:
             date = fields[0]
@@ -38,10 +45,13 @@ class Filter:
     def run(self, pika):
         try:
             rainy_trips_avg = DurationAverages()
-            pika.start_consuming("rainy_trips", rainy_trips_avg.callback)
+            pika.start_consuming("RAINY_rainy_trips", rainy_trips_avg.callback)
             results = rainy_trips_avg.calculate_avg()
             self.logger.info("Publishing results...")
-            pika.publish(message=str(results), exchange="", routing_key="query_results")
+            message = "type=rainy_query"
+            for date, avg in results.items():
+                message += f"|{date},{avg}"
+            pika.publish(message=message, exchange="", routing_key="CLIENT_results")
         except Exception as e:
             self.logger.error(f"Error consuming message: {e}")
         finally:

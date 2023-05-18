@@ -1,7 +1,7 @@
 import logging
 import os
 
-TOTAL_WORKERS = int(os.getenv("TOTAL_WORKERS"))
+JOIN_FILTER_REPLICAS = int(os.getenv("JOIN_FILTER_REPLICAS", 1))
 
 
 class CountStations:
@@ -47,7 +47,7 @@ class CountStations:
             self.logger.info(
                 f"Message contains end_stream. Total end_stream received: {self.total_end_streams}"
             )
-            if self.total_end_streams == TOTAL_WORKERS:
+            if self.total_end_streams == JOIN_FILTER_REPLICAS:
                 self.logger.info("All workers finished. Calculating doubled trips...")
                 self.pika.ack(method)
                 self.pika.stop_consuming()
@@ -57,6 +57,7 @@ class CountStations:
             if row == "":
                 continue
             fields = row.split(",")
+            fields = [field.split("=")[1] for field in fields]
             station = fields[0]
             year = fields[1]
             self.count(station, year)
@@ -78,7 +79,9 @@ class Filter:
 
             results = count_stations.calculate_doubled_trips()
             self.logger.info("Publishing results...")
-            self.pika.publish(message=results, exchange="", routing_key="query_results")
+            self.pika.publish(
+                message=results, exchange="", routing_key="CLIENT_results"
+            )
         except Exception as e:
             self.logger.error(f"Error consuming message: {e}")
         finally:

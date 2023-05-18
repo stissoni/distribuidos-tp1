@@ -3,17 +3,7 @@ import signal
 import sys
 from filter import Filter
 from pika_client import PikaClient
-
-
-class GracefulKiller:
-    kill_now = False
-
-    def __init__(self):
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
-
-    def exit_gracefully(self, *args):
-        logging.info("action: receive_sigterm_signal | result: exiting gracefully!")
-        sys.exit(0)
+from gracefull_killer import GracefulKiller
 
 
 if __name__ == "__main__":
@@ -21,13 +11,10 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
     )
     pika = PikaClient("rabbit")
-    pika.declare_exchange("stations", "fanout")
-    stations_queue = pika.bind_to_exchange("stations")
-    pika.declare_queue("montreal_trips")
+    stations_average_queue = pika.declare_queue("MONTREAL_stations_average")
     filter = Filter(pika)
-    gc = GracefulKiller()
+    gc = GracefulKiller(pika)
     try:
-        filter.run(stations_queue)
-    except:
-        # Exiting gracefully
-        sys.exit(0)
+        filter.run()
+    except Exception as e:
+        logging.error(f"Error consuming message: {e}")

@@ -1,24 +1,11 @@
 #!/usr/bin/env python3
-import signal
-import sys
 import time
 from client import Client
 from pika_client import PikaClient
+from gracefull_killer import GracefulKiller
 import logging
 
 RABBIT_HOST = "rabbit"
-
-# 
-
-class GracefulKiller:
-    kill_now = False
-
-    def __init__(self):
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
-
-    def exit_gracefully(self, *args):
-        logging.info("action: receive_sigterm_signal | result: exiting gracefully!")
-        self.pika.close()
 
 
 if __name__ == "__main__":
@@ -29,15 +16,11 @@ if __name__ == "__main__":
     )
     pika = PikaClient(RABBIT_HOST)
     # Create queues and exchanges
-    pika.declare_queue("montreal_filter")
-    pika.declare_queue("rainy_filter")
-    pika.declare_queue("2016&2017_filter")
-    pika.declare_exchange("weather", "fanout")
-    pika.declare_exchange("stations", "fanout")
+    pika.declare_queue("CLIENT_queue")
+    pika.declare_queue("CLIENT_results")
     client = Client(pika)
-    gk = GracefulKiller()
+    gk = GracefulKiller(pika)
     try:
         client.run()
     except Exception as e:
         logging.exception(f"Exception in client: {e}")
-        sys.exit(0)

@@ -1,8 +1,10 @@
 import logging
+import signal
 import sys
 from filter import Filter
 from pika_client import PikaClient
 from gracefull_killer import GracefulKiller
+
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -10,11 +12,11 @@ if __name__ == "__main__":
     )
     pika = PikaClient("rabbit")
     stations_queue = pika.bind_to_exchange("stations")
-    trips_queue = pika.declare_queue("MONTREAL_montreal_trips")
-    stations_average_queue = pika.declare_queue("MONTREAL_stations_average")
-    gc = GracefulKiller(pika)
+    filter_queue = pika.declare_queue("20162017_join_filter")
+    next_step_queue = pika.declare_queue("20162017_count_stations")
     filter = Filter(pika)
+    gc = GracefulKiller(pika)
     try:
-        filter.run(trips_queue, stations_queue)
+        filter.run(stations_queue, filter_queue, next_step_queue)
     except Exception as e:
         logging.error(f"Error consuming message: {e}")

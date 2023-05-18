@@ -19,7 +19,9 @@ class TripsHandler:
                 f"Trip {city},{date},{duration} was rainy. Redirecting message!"
             )
             message = f"{date},{duration}"
-            self.pika.publish(message=message, exchange="", routing_key="rainy_trips")
+            self.pika.publish(
+                message=message, exchange="", routing_key="RAINY_rainy_trips"
+            )
             return
 
     def callback(self, ch, method, properties, body):
@@ -32,12 +34,12 @@ class TripsHandler:
             self.pika.stop_consuming()
             self.pika.ack(method)
             return
-        self.logger.info("Processing new message!")
+
         for row in rows:
             fields = row.split(",")
-            city = fields[0].split("=")[1].split("/")[0]
-            start_date = fields[1].split("=")[1].split(" ")[0]
-            duration_sec = float(fields[2].split("=")[1])
+            city = header.split(",")[1].split("=")[1].split("/")[0]
+            start_date = fields[0].split("=")[1].split(" ")[0]
+            duration_sec = float(fields[4].split("=")[1])
             if duration_sec < 0:
                 duration_sec = 0
             self.calculate_trip_rain(city, start_date, duration_sec)

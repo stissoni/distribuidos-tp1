@@ -1,56 +1,58 @@
 import logging
-import sys
-from threading import Thread
-from stations_handler import StationsHandler
-from trips_handler import TripsHandler
-from multiprocessing import Pool
+import os
+
+MONTREAL_FILTER_REPLICAS = int(os.getenv("MONTREAL_FILTER_REPLICAS", 1))
 
 
 class MontrealAverages:
-    def __init__(self) -> None:
+    def __init__(self, pika) -> None:
         self.logger = logging.getLogger("montreal_stations_avg")
+        self.pika = pika
+        self.count_end_streams = 0
+        self.distances = {}
+        self.averages = {}
 
-    def calculate_avg(self, trips_handler, stations_handler):
-        trips = trips_handler.get_trips()
-        i = 0
-        total = len(trips)
-        distances = {}
+    def publish_query_results(self):
+        results = self.calculate_average()
+        self.logger.info("Publishing query results!")
+        message = "type=montreal_query"
+        for tuple in results:
+            station = tuple[0]
+            average = tuple[1]
+            message += f"|{station},{average}"
+        self.pika.publish(message, exchange="", routing_key="CLIENT_results")
 
-        for trip in trips:
-            try:
-                start_station_code = trip[0]
-                end_station_code = trip[1]
-                year = trip[2]
-                end_station_name = stations_handler.get_station(end_station_code, year)[
-                    "name"
-                ]
-                self.logger.info(
-                    f"Obtaining distance trip {i}/{total}: {end_station_name}"
-                )
-                distance = stations_handler.get_distance_between_stations(
-                    start_station_code, end_station_code, year
-                )
-                if end_station_name not in distances:
-                    distances[end_station_name] = []
-                distances[end_station_name].append(distance)
-            except Exception as e:
-                self.logger.warning(
-                    f"Error obtaining distance for trip {trip}. Error: {e}. Skipping..."
-                )
-                pass
-            i += 1
+    def callback(self, ch, method, properties, body):
+        message = body.decode("utf-8")
+        header = message.split("|")[0]
+        rows = message.split("|")[1:]
 
-        self.logger.info("Calculating averages...")
-        avgs = {
-            end_station_name: sum(distances[end_station_name])
-            / len(distances[end_station_name])
-            for end_station_name in distances.keys()
+        if header == "type=end_stream":
+            self.count_end_streams += 1
+            self.logger.info(f"Received end_stream. Count: {self.count_end_streams}")
+            if self.count_end_streams == MONTREAL_FILTER_REPLICAS:
+                self.publish_query_results()
+                self.pika.stop_consuming()
+            self.pika.ack(method)
+            return
+        for row in rows:
+            station = row.split(",")[0]
+            distance = float(row.split(",")[1])
+            if station not in self.distances:
+                self.distances[station] = []
+            self.distances[station].append(distance)
+        self.pika.ack(method)
+
+    def calculate_average(self):
+        result = {
+            end_station_name: sum(distances) / len(distances)
+            for end_station_name, distances in self.distances.items()
         }
-        self.logger.info("Obtaining stations with average distance > 6 km...")
         more_than_6 = [
-            (end_station_name, avg) for end_station_name, avg in avgs.items() if avg > 6
+            (end_station_name, avg)
+            for end_station_name, avg in result.items()
+            if avg > 6
         ]
-        self.logger.info(f"Averages for stations: {avgs}")
         self.logger.info(f"Stations with average distance > 6 km: {more_than_6}")
         return more_than_6
 
@@ -60,31 +62,12 @@ class Filter:
         self.logger = logging.getLogger("montreal_avg")
         self.pika = pika
 
-    def run(self, stations_queue):
+    def run(self):
         try:
-            stations_handler = StationsHandler(self.pika)
-            trips_handler = TripsHandler(self.pika)
-            self.logger.info("Consuming from stations queue")
-            self.pika.start_consuming(stations_queue, stations_handler.callback)
-            # create a thread and start calculating distances in parallel
-            thread = Thread(target=stations_handler.calculate_distances)
-            thread.start()
-            self.logger.info("Consuming from trips queue")
-            self.pika.start_consuming("montreal_trips", trips_handler.callback)
-            # wait for the thread to finish
-            thread.join()
-            mtrl_avg = MontrealAverages()
-            results = mtrl_avg.calculate_avg(trips_handler, stations_handler)
-            self.logger.info("Publishing results...")
-            self.pika.publish(
-                message=str(results), exchange="", routing_key="query_results"
-            )
+            mtrl_avg = MontrealAverages(self.pika)
+            self.pika.start_consuming("MONTREAL_stations_average", mtrl_avg.callback)
         except Exception as e:
             self.logger.error(f"Error consuming message: {e}")
         finally:
             self.logger.info("Exiting gracefully")
-            thread.terminate()
-            try:
-                self.pika.close()
-            except:
-                sys.exit(0)
+            self.pika.close()

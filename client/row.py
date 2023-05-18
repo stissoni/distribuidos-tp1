@@ -10,5 +10,5 @@ class Row:
     # Generate string representation of row
     def __str__(self) -> str:
         row = [f"{self.fields[i]}={self.values[i]}" for i in range(len(self.values))]
-        row = f"table={self.table}," + ",".join(row)
+        row = ",".join(row)
         return row

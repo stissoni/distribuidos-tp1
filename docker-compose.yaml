@@ -19,53 +19,55 @@ services:
     restart: on-failure
     depends_on:
       - rabbit
+      - driver
+      - montreal_filter
+      - montreal_stations
+      - 20162017_trips_filter
+      - 20162017_join_filter
+      - 20162017_count
+      - rainy_filter
+      - rainy_durations
     links:
       - rabbit
-      - montreal_filter
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./client:/app/client
       - ./client/data:/app/data
       - ./pika_client/pika_client.py:/app/client/pika_client.py
-
+      - ./gracefull_killer/gracefull_killer.py:/app/client/gracefull_killer.py
+  driver:
+    build:
+      context: ./driver
+      dockerfile: driver.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - montreal_filter
+      - montreal_stations
+      - 20162017_trips_filter
+      - 20162017_join_filter
+      - 20162017_count
+      - rainy_filter
+      - rainy_durations
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
+      - TRIPS_FILTER_2016_2017_REPLICAS=3
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./driver:/app/driver
+      - ./pika_client/pika_client.py:/app/driver/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/driver/gracefull_killer.py
   montreal_filter:
     build:
       context: ./montreal_filter
       dockerfile: montreal_filter.dockerfile
     restart: on-failure
     depends_on:
-      - rabbit
       - montreal_stations
-    links:
-      - rabbit
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./montreal_filter:/app/montreal_filter
-      - ./pika_client/pika_client.py:/app/montreal_filter/pika_client.py
-
-  rainy_filter:
-    build:
-      context: ./rainy_filter
-      dockerfile: rainy_filter.dockerfile
-    restart: on-failure
-    depends_on:
-      - rabbit
-    links:
-      - rabbit
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./rainy_filter:/app/rainy_filter
-      - ./pika_client/pika_client.py:/app/rainy_filter/pika_client.py
-
-  20162017_filter:
-    build:
-      context: ./2016&2017_filter
-      dockerfile: 2016&2017_filter.dockerfile
-    restart: on-failure
-    depends_on:
       - rabbit
     links:
       - rabbit
@@ -75,40 +77,9 @@ services:
       mode: replicated
       replicas: 3
     volumes:
-      - ./2016&2017_filter:/app/2016&2017_filter
-      - ./pika_client/pika_client.py:/app/2016&2017_filter/pika_client.py
-
-  20162017_count:
-    build:
-      context: ./2016&2017_count
-      dockerfile: 2016&2017_count.dockerfile
-    restart: on-failure
-    depends_on:
-      - rabbit
-    links:
-      - rabbit
-    environment:
-      - PYTHONUNBUFFERED=1
-      - TOTAL_WORKERS=3
-    volumes:
-      - ./2016&2017_count:/app/2016&2017_count
-      - ./pika_client/pika_client.py:/app/2016&2017_count/pika_client.py
-
-  rainy_durations:
-    build:
-      context: ./rainy_durations
-      dockerfile: rainy_durations.dockerfile
-    restart: on-failure
-    depends_on:
-      - rabbit
-    links:
-      - rabbit
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./rainy_durations:/app/rainy_durations
-      - ./pika_client/pika_client.py:/app/rainy_durations/pika_client.py
-
+      - ./montreal_filter:/app/montreal_filter
+      - ./pika_client/pika_client.py:/app/montreal_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_filter/gracefull_killer.py
   montreal_stations:
     build:
       context: ./montreal_stations
@@ -120,6 +91,96 @@ services:
       - rabbit
     environment:
       - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
     volumes:
       - ./montreal_stations:/app/montreal_stations
       - ./pika_client/pika_client.py:/app/montreal_stations/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_stations/gracefull_killer.py
+  20162017_trips_filter:
+    build:
+      context: ./2016&2017_trips_filter
+      dockerfile: 2016&2017_trips_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+      - 20162017_join_filter
+      - 20162017_count
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      mode: replicated
+      replicas: 3
+    volumes:
+      - ./2016&2017_trips_filter:/app/2016&2017_trips_filter
+      - ./pika_client/pika_client.py:/app/2016&2017_trips_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_trips_filter/gracefull_killer.py
+  20162017_join_filter:
+    build:
+      context: ./2016&2017_join_filter
+      dockerfile: 2016&2017_join_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+      - 20162017_count
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TRIPS_FILTER_REPLICAS=3
+    volumes:
+      - ./2016&2017_join_filter:/app/2016&2017_join_filter
+      - ./pika_client/pika_client.py:/app/2016&2017_join_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_join_filter/gracefull_killer.py
+  20162017_count:
+    build:
+      context: ./2016&2017_count
+      dockerfile: 2016&2017_count.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - JOIN_FILTER_REPLICAS=1
+    volumes:
+      - ./2016&2017_count:/app/2016&2017_count
+      - ./pika_client/pika_client.py:/app/2016&2017_count/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_count/gracefull_killer.py
+  rainy_durations:
+    build:
+      context: ./rainy_durations
+      dockerfile: rainy_durations.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./rainy_durations:/app/rainy_durations
+      - ./pika_client/pika_client.py:/app/rainy_durations/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/rainy_durations/gracefull_killer.py
+  rainy_filter:
+    build:
+      context: ./rainy_filter
+      dockerfile: rainy_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - rainy_durations
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      mode: replicated
+      replicas: 3
+    volumes:
+      - ./rainy_filter:/app/rainy_filter
+      - ./pika_client/pika_client.py:/app/rainy_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/rainy_filter/gracefull_killer.py

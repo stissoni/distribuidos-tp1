@@ -1,5 +1,5 @@
-# Ignore __pycache__ directories
-global-exclude __pycache__
-
 # Ignore ./client/data
-prune client/data
+client/data
+
+# Ignore all __pycache__ directories
+**/__pycache__/
