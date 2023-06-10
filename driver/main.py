@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 from driver import Driver
 from pika_client import PikaClient
 from gracefull_killer import GracefulKiller
@@ -13,7 +14,7 @@ if __name__ == "__main__":
     )
     pika = PikaClient(RABBIT_HOST)
     # Create queues and exchanges
-    pika.declare_queue("client_queue")
+    pika.declare_queue("CLIENT_queue")
 
     pika.declare_queue("MONTREAL_montreal_trips")
     pika.declare_queue("MONTREAL_stations_average")
@@ -35,6 +36,10 @@ if __name__ == "__main__":
     driver = Driver(pika)
     gk = GracefulKiller(pika)
     try:
-        driver.run()
+        if len(sys.argv) > 1:
+            print(f"Running for query {sys.argv[1]}")
+            driver.run(sys.argv[1])
+        else:
+            driver.run()
     except Exception as e:
         logging.exception(f"Exception in client: {e}")

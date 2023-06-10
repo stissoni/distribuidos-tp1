@@ -11,9 +11,11 @@ class Driver:
         self.logger = logging.getLogger("driver")
         self.pika = pika
         self.end_streams = {}
+        self.query = None
 
     def publish_end_stream(self, queue, table, times=1):
         message = f"type=end_stream,table={table}"
+        print("Publishing {} {} {} times".format(message, queue, times))
         for i in range(times):
             self.pika.publish(message, exchange="", routing_key=queue)
 
@@ -35,23 +37,23 @@ class Driver:
                     self.publish_end_stream(
                         queue, table, times=MONTREAL_FILTER_REPLICAS
                     )
-                if queue == "20162017_montreal_trips":
+                elif queue == "20162017_montreal_trips":
                     self.publish_end_stream(
                         queue, table, times=TRIPS_FILTER_REPLICAS_2016_2017
                     )
-                if queue == "20162017_toronto_trips":
+                elif queue == "20162017_toronto_trips":
                     self.publish_end_stream(
                         queue, table, times=TRIPS_FILTER_REPLICAS_2016_2017
                     )
-                if queue == "20162017_washington_trips":
+                elif queue == "20162017_washington_trips":
                     self.publish_end_stream(
                         queue, table, times=TRIPS_FILTER_REPLICAS_2016_2017
                     )
-                if queue == "RAINY_montreal_trips":
+                elif queue == "RAINY_montreal_trips":
                     self.publish_end_stream(queue, table, times=RAINY_FILTER_REPLICAS)
-                if queue == "RAINY_toronto_trips":
+                elif queue == "RAINY_toronto_trips":
                     self.publish_end_stream(queue, table, times=RAINY_FILTER_REPLICAS)
-                if queue == "RAINY_washington_trips":
+                elif queue == "RAINY_washington_trips":
                     self.publish_end_stream(queue, table, times=RAINY_FILTER_REPLICAS)
                 else:
                     self.publish_end_stream(queue, table, times=1)
@@ -60,16 +62,48 @@ class Driver:
                 self.pika.publish(message, exchange="", routing_key=queue)
 
     def get_queues_from_table(self, table):
-        if table == "table=montreal/trip":
-            return [
-                "MONTREAL_montreal_trips",
-                "20162017_montreal_trips",
-                "RAINY_montreal_trips",
-            ]
-        if table == "table=toronto/trip":
-            return ["20162017_toronto_trips", "RAINY_toronto_trips"]
-        if table == "table=washington/trip":
-            return ["20162017_washington_trips", "RAINY_washington_trips"]
+        if self.query is None:
+            if table == "table=montreal/trip":
+                return [
+                    "MONTREAL_montreal_trips",
+                    "20162017_montreal_trips",
+                    "RAINY_montreal_trips",
+                ]
+            elif table == "table=toronto/trip":
+                return ["20162017_toronto_trips", "RAINY_toronto_trips"]
+            elif table == "table=washington/trip":
+                return ["20162017_washington_trips", "RAINY_washington_trips"]
+            else:
+                return []
+        if self.query == "rainy_query":
+            if table == "table=montreal/trip":
+                return [
+                    "RAINY_montreal_trips",
+                ]
+            elif table == "table=toronto/trip":
+                return ["RAINY_toronto_trips"]
+            elif table == "table=washington/trip":
+                return ["RAINY_washington_trips"]
+            else:
+                return []
+        if self.query == "2016_2017_query":
+            if table == "table=montreal/trip":
+                return [
+                    "20162017_montreal_trips",
+                ]
+            elif table == "table=toronto/trip":
+                return ["20162017_toronto_trips"]
+            elif table == "table=washington/trip":
+                return ["20162017_washington_trips"]
+            else:
+                return []
+        if self.query == "montreal_query":
+            if table == "table=montreal/trip":
+                return [
+                    "MONTREAL_montreal_trips",
+                ]
+            else:
+                return []
 
     def callback(self, ch, method, properties, body):
         message = body.decode("utf-8")
@@ -90,5 +124,6 @@ class Driver:
         if len(self.end_streams) == 9:
             self.pika.stop_consuming()
 
-    def run(self):
-        self.pika.start_consuming("client_queue", self.callback)
+    def run(self, query=None):
+        self.query = query
+        self.pika.start_consuming("CLIENT_queue", self.callback)

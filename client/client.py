@@ -31,14 +31,14 @@ class Client:
                     message += f"|{str(row)}"
                     rows_sended += 1
                     if rows_sended == BATCH_SIZE:
-                        self.publish_to_queue("client_queue", message)
+                        self.publish_to_queue("CLIENT_queue", message)
                         message = f"type=stream_data,table={table_name}"
                         rows_sended = 0
                 if rows_sended > 0:
-                    self.publish_to_queue("client_queue", message)
+                    self.publish_to_queue("CLIENT_queue", message)
 
                 message = f"type=end_stream,table={table_name}"
-                self.publish_to_queue("client_queue", message)
+                self.publish_to_queue("CLIENT_queue", message)
 
     def results_callback(self, ch, method, properties, body):
         message = body.decode("utf-8")
