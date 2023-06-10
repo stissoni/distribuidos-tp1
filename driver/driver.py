@@ -125,5 +125,8 @@ class Driver:
             self.pika.stop_consuming()
 
     def run(self, query=None):
-        self.query = query
+        if self.query is not in ["2016_2017_query", "montreal_query", "rainy_query"]:
+            self.query = None
+        else:
+            self.query = query
         self.pika.start_consuming("CLIENT_queue", self.callback)
