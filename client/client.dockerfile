@@ -1,6 +1,5 @@
-FROM ubuntu:20.04
+FROM python:3.11-slim-bullseye
 
-RUN apt update && apt install python3 python3-pip -y
 RUN pip3 install pika
 
 ENTRYPOINT [ "python3", "/app/client/main.py" ]

@@ -1,5 +1,6 @@
 # Ignore ./client/data
-client/data
+client/data/*.zip
+client/data/*.csv
 
 # Ignore all __pycache__ directories
 **/__pycache__/

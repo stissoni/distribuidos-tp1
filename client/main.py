@@ -9,8 +9,8 @@ RABBIT_HOST = "rabbit"
 
 
 if __name__ == "__main__":
-    # Wait 10 seconds to allow cluster to start
-    time.sleep(10)
+    # Wait 15 seconds to allow cluster to start
+    time.sleep(15)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
     )

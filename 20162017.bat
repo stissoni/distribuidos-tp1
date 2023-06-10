@@ -1,0 +1,1 @@
+docker compose -f docker-compose.yaml up -d --build client rabbit driver 20162017_trips_filter 20162017_join_filter 20162017_count
