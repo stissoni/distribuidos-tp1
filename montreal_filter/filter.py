@@ -23,6 +23,10 @@ class TripsHandler:
         type = header.split(",")[0]
         rows = message.split("|")[1:]
 
+        # Save message to disk in order to make the process fault tolerant
+        with open("montreal_trips.txt", "a") as f:
+            f.write(message + "\n")
+
         if type == "type=end_stream":
             self.logger.info("Received end_stream for montreal/trip")
             self.pika.publish(
@@ -104,6 +108,9 @@ class StationsHandler:
             self.stations[code][year] = {"name": name, "lat": lat, "lon": lon}
         else:
             raise Exception(f"Station {code},{year} already exists")
+        # Save data to disk in order to make the process fault tolerant
+        with open("montreal_stations.txt", "a") as f:
+            f.write(f"{code},{year},{name},{lat},{lon}\n")
 
     def callback(self, ch, method, properties, body):
         message = body.decode("utf-8")

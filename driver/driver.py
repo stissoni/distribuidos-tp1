@@ -77,9 +77,7 @@ class Driver:
                 return []
         if self.query == "rainy_query":
             if table == "table=montreal/trip":
-                return [
-                    "RAINY_montreal_trips",
-                ]
+                return ["RAINY_montreal_trips"]
             elif table == "table=toronto/trip":
                 return ["RAINY_toronto_trips"]
             elif table == "table=washington/trip":
@@ -88,9 +86,7 @@ class Driver:
                 return []
         if self.query == "2016_2017_query":
             if table == "table=montreal/trip":
-                return [
-                    "20162017_montreal_trips",
-                ]
+                return ["20162017_montreal_trips"]
             elif table == "table=toronto/trip":
                 return ["20162017_toronto_trips"]
             elif table == "table=washington/trip":
@@ -99,9 +95,7 @@ class Driver:
                 return []
         if self.query == "montreal_query":
             if table == "table=montreal/trip":
-                return [
-                    "MONTREAL_montreal_trips",
-                ]
+                return ["MONTREAL_montreal_trips"]
             else:
                 return []
 
@@ -125,8 +119,9 @@ class Driver:
             self.pika.stop_consuming()
 
     def run(self, query=None):
-        if self.query is not in ["2016_2017_query", "montreal_query", "rainy_query"]:
+        if query not in ["2016_2017_query", "montreal_query", "rainy_query"]:
             self.query = None
         else:
             self.query = query
+        print(f"Running for query {self.query}")
         self.pika.start_consuming("CLIENT_queue", self.callback)

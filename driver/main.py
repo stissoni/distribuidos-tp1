@@ -37,7 +37,6 @@ if __name__ == "__main__":
     gk = GracefulKiller(pika)
     try:
         if len(sys.argv) > 1:
-            print(f"Running for query {sys.argv[1]}")
             driver.run(sys.argv[1])
         else:
             driver.run()

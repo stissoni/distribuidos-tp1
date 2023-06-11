@@ -1,0 +1,1 @@
+docker compose -f docker-compose_only-montreal_query.yaml up -d --build

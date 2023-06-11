@@ -1,0 +1,105 @@
+version: '3'
+services:
+  rabbit:
+    build:
+      context: ./rabbit
+      dockerfile: rabbit.dockerfile
+    ports:
+      - 15672:15672
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:15672" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  client:
+    build:
+      context: ./client
+      dockerfile: client.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - driver
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./client:/app/client
+      - ./client/data:/app/data
+      - ./pika_client/pika_client.py:/app/client/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/client/gracefull_killer.py
+  driver:
+    build:
+      context: ./driver
+      dockerfile: driver.dockerfile
+    restart: on-failure
+    command: 2016_2017_query
+    depends_on:
+      - rabbit
+      - 20162017_trips_filter
+      - 20162017_join_filter
+      - 20162017_count
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
+      - TRIPS_FILTER_2016_2017_REPLICAS=3
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./driver:/app/driver
+      - ./pika_client/pika_client.py:/app/driver/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/driver/gracefull_killer.py
+  20162017_trips_filter:
+    build:
+      context: ./2016&2017_trips_filter
+      dockerfile: 2016&2017_trips_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+      - 20162017_join_filter
+      - 20162017_count
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      mode: replicated
+      replicas: 3
+    volumes:
+      - ./2016&2017_trips_filter:/app/2016&2017_trips_filter
+      - ./pika_client/pika_client.py:/app/2016&2017_trips_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_trips_filter/gracefull_killer.py
+  20162017_join_filter:
+    build:
+      context: ./2016&2017_join_filter
+      dockerfile: 2016&2017_join_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+      - 20162017_count
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TRIPS_FILTER_REPLICAS=3
+    volumes:
+      - ./2016&2017_join_filter:/app/2016&2017_join_filter
+      - ./pika_client/pika_client.py:/app/2016&2017_join_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_join_filter/gracefull_killer.py
+  20162017_count:
+    build:
+      context: ./2016&2017_count
+      dockerfile: 2016&2017_count.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - JOIN_FILTER_REPLICAS=1
+    volumes:
+      - ./2016&2017_count:/app/2016&2017_count
+      - ./pika_client/pika_client.py:/app/2016&2017_count/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/2016&2017_count/gracefull_killer.py

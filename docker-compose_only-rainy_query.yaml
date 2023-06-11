@@ -1,0 +1,86 @@
+version: '3'
+services:
+  rabbit:
+    build:
+      context: ./rabbit
+      dockerfile: rabbit.dockerfile
+    ports:
+      - 15672:15672
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:15672" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  client:
+    build:
+      context: ./client
+      dockerfile: client.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - driver
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./client:/app/client
+      - ./client/data:/app/data
+      - ./pika_client/pika_client.py:/app/client/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/client/gracefull_killer.py
+  driver:
+    build:
+      context: ./driver
+      dockerfile: driver.dockerfile
+    restart: on-failure
+    command: rainy_query
+    depends_on:
+      - rabbit
+      - rainy_durations
+      - rainy_filter
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
+      - TRIPS_FILTER_2016_2017_REPLICAS=3
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./driver:/app/driver
+      - ./pika_client/pika_client.py:/app/driver/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/driver/gracefull_killer.py
+  rainy_durations:
+    build:
+      context: ./rainy_durations
+      dockerfile: rainy_durations.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./rainy_durations:/app/rainy_durations
+      - ./pika_client/pika_client.py:/app/rainy_durations/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/rainy_durations/gracefull_killer.py
+  rainy_filter:
+    build:
+      context: ./rainy_filter
+      dockerfile: rainy_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - rainy_durations
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      mode: replicated
+      replicas: 3
+    volumes:
+      - ./rainy_filter:/app/rainy_filter
+      - ./pika_client/pika_client.py:/app/rainy_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/rainy_filter/gracefull_killer.py

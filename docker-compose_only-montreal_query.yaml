@@ -1,0 +1,120 @@
+version: '3'
+services:
+  rabbit:
+    build:
+      context: ./rabbit
+      dockerfile: rabbit.dockerfile
+    ports:
+      - 15672:15672
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:15672" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  client:
+    build:
+      context: ./client
+      dockerfile: client.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+      - driver
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./client:/app/client
+      - ./client/data:/app/data
+      - ./pika_client/pika_client.py:/app/client/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/client/gracefull_killer.py
+  driver:
+    build:
+      context: ./driver
+      dockerfile: driver.dockerfile
+    restart: on-failure
+    command: montreal_query
+    depends_on:
+      - rabbit
+      - montreal_filter_1
+      - montreal_filter_2
+      - montreal_filter_3
+      - montreal_stations
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
+      - TRIPS_FILTER_2016_2017_REPLICAS=3
+      - RAINY_FILTER_REPLICAS=3
+    volumes:
+      - ./driver:/app/driver
+      - ./pika_client/pika_client.py:/app/driver/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/driver/gracefull_killer.py
+  montreal_filter_1:
+    build:
+      context: ./montreal_filter
+      dockerfile: montreal_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - montreal_stations
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID_FILTER=1
+    volumes:
+      - ./montreal_filter:/app/montreal_filter
+      - ./pika_client/pika_client.py:/app/montreal_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_filter/gracefull_killer.py
+  montreal_filter_2:
+    build:
+      context: ./montreal_filter
+      dockerfile: montreal_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - montreal_stations
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID_FILTER=2
+    volumes:
+      - ./montreal_filter:/app/montreal_filter
+      - ./pika_client/pika_client.py:/app/montreal_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_filter/gracefull_killer.py
+  montreal_filter_3:
+    build:
+      context: ./montreal_filter
+      dockerfile: montreal_filter.dockerfile
+    restart: on-failure
+    depends_on:
+      - montreal_stations
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID_FILTER=3
+    volumes:
+      - ./montreal_filter:/app/montreal_filter
+      - ./pika_client/pika_client.py:/app/montreal_filter/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_filter/gracefull_killer.py
+  montreal_stations:
+    build:
+      context: ./montreal_stations
+      dockerfile: montreal_stations.dockerfile
+    restart: on-failure
+    depends_on:
+      - rabbit
+    links:
+      - rabbit
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONTREAL_FILTER_REPLICAS=3
+    volumes:
+      - ./montreal_stations:/app/montreal_stations
+      - ./pika_client/pika_client.py:/app/montreal_stations/pika_client.py
+      - ./gracefull_killer/gracefull_killer.py:/app/montreal_stations/gracefull_killer.py

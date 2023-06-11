@@ -1,0 +1,1 @@
+docker compose -f docker-compose_only-rainy_query.yaml up -d --build
