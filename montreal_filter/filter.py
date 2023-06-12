@@ -1,4 +1,8 @@
 import logging
+import os
+import signal
+import sys
+import time
 from haversine import haversine
 
 
@@ -62,6 +66,7 @@ class StationsHandler:
         self.pika = pika
         self.stations = {}
         self.distances = {}
+        self.count_to_exit = 0
 
     def get_station_name(self, code, year):
         return self.stations[code][year]["name"]
@@ -100,7 +105,7 @@ class StationsHandler:
         self.distances[key] = distance
         return distance
 
-    def save_station(self, code, year, name, lat, lon):
+    def save_station(self, code, year, name, lat, lon, to_disk=True):
         self.logger.info(f"Saving station {code},{year},{name},{lat},{lon}")
         if code not in self.stations:
             self.stations[code] = {year: {"name": name, "lat": lat, "lon": lon}}
@@ -108,22 +113,31 @@ class StationsHandler:
             self.stations[code][year] = {"name": name, "lat": lat, "lon": lon}
         else:
             raise Exception(f"Station {code},{year} already exists")
+
         # Save data to disk in order to make the process fault tolerant
-        with open("montreal_stations.txt", "a") as f:
-            f.write(f"{code},{year},{name},{lat},{lon}\n")
+        if to_disk:
+            with open("montreal_stations.txt", "a") as f:
+                f.write(f"{code},{year},{name},{lat},{lon}\n")
 
     def callback(self, ch, method, properties, body):
+        # Simulate a fault in the system at nth message from queue for debuggin
+
+        self.count_to_exit += 1
+        if self.count_to_exit == 5:
+            sys.exit(-1)
+
         message = body.decode("utf-8")
-        self.logger.info(f"Received message: {message[0:120]}...")
+        self.logger.info(f"Received message {self.count_to_exit}: {message[0:120]}...")
         header = message.split("|")[0]
         type = header.split(",")[0]
         table = header.split(",")[1]
         rows = message.split("|")[1:]
 
         if table != "table=montreal/station":
+            self.logger.info("Ignoring message!")
             return
-        elif type == "type=end_stream" and table == "table=montreal/station":
-            self.logger.info("Received end_stream for montreal/station")
+        elif type == "type=end_stream":
+            self.logger.info("Received end_stream")
             self.pika.ack(method)
             self.pika.stop_consuming()
             return
@@ -142,6 +156,10 @@ class StationsHandler:
                 except Exception as e:
                     self.logger.error(f"Error parsing row: {row}. Error: {e}")
                     continue
+
+        print("SLEEPING FOR 10 SECONDS. KILL NOW!!!!!!!!!!!")
+        time.sleep(10)
+
         self.pika.ack(method)
 
 
@@ -153,11 +171,34 @@ class Filter:
     def run(self, trips_queue, stations_queue):
         try:
             stations_handler = StationsHandler(self.pika)
+            # Check if montreal_stations.txt exists, if so, load it else start consuming
+            if os.path.exists("montreal_stations.txt"):
+                self.logger.info("Loading stations from disk")
+                with open("montreal_stations.txt", "r") as f:
+                    for line in f:
+                        fields = line.split(",")
+                        fields = [field.strip() for field in fields]
+                        code = int(fields[0])
+                        year = int(fields[1])
+                        name = fields[2]
+                        lat = float(fields[3])
+                        lon = float(fields[4])
+                        print(
+                            "Loading station information from disk",
+                            code,
+                            year,
+                            name,
+                            lat,
+                            lon,
+                        )
+                        stations_handler.save_station(
+                            code, year, name, lat, lon, to_disk=False
+                        )
             trips_handler = TripsHandler(stations_handler, self.pika)
             self.pika.start_consuming(stations_queue, stations_handler.callback)
-            self.pika.start_consuming(trips_queue, trips_handler.callback)
+            # self.pika.start_consuming(trips_queue, trips_handler.callback)
         except Exception as e:
             self.logger.error(f"Error consuming message: {e}")
         finally:
             self.logger.info("Exiting gracefully")
-            self.pika.close()
+            # self.pika.close()

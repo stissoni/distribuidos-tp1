@@ -12,6 +12,18 @@ class Driver:
         self.pika = pika
         self.end_streams = {}
         self.query = None
+        self.stations_exchange = None
+        self.weather_exchange = None
+
+    def set_stations_exchange(self, stations_exchange):
+        if not isinstance(stations_exchange, str):
+            raise Exception("stations_exchange must be a string")
+        self.stations_exchange = stations_exchange
+
+    def set_weather_exchange(self, weather_exchange):
+        if not isinstance(weather_exchange, str):
+            raise Exception("weather_exchange must be a string")
+        self.weather_exchange = weather_exchange
 
     def publish_end_stream(self, queue, table, times=1):
         message = f"type=end_stream,table={table}"
@@ -22,12 +34,12 @@ class Driver:
     def handle_stations(self, message_type, table, message):
         if message_type == "type=end_stream":
             self.end_streams[table] = True
-        self.pika.publish(message, exchange="stations", routing_key="")
+        self.pika.publish(message, exchange=self.stations_exchange, routing_key="")
 
     def handle_weather(self, message_type, table, message):
         if message_type == "type=end_stream":
             self.end_streams[table] = True
-        self.pika.publish(message, exchange="weather", routing_key="")
+        self.pika.publish(message, exchange=self.weather_exchange, routing_key="")
 
     def handle_trips(self, message_type, table, message):
         if message_type == "type=end_stream":

@@ -25,6 +25,10 @@ class PikaClient:
 
     def declare_exchange(self, name, exchange_type="fanout"):
         self.channel.exchange_declare(exchange=name, exchange_type=exchange_type)
+        return name
+
+    def bind_queue_to_exchange(self, queue, exchange):
+        self.channel.queue_bind(exchange=exchange, queue=queue)
 
     def bind_to_exchange(self, exchange):
         result = self.channel.queue_declare(queue="", exclusive=True)
@@ -38,6 +42,13 @@ class PikaClient:
 
     def stop_consuming(self):
         self.channel.stop_consuming()
+
+    # Create function to ack a particular message by delivery tag
+    def ack_message_by_delivery_tag(self, delivery_tag):
+        if self.channel.is_open:
+            self.channel.basic_ack(delivery_tag)
+        else:
+            raise Exception("Channel closed")
 
     def ack(self, method):
         self.channel.basic_ack(delivery_tag=method.delivery_tag)

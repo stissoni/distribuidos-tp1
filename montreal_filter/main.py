@@ -19,7 +19,7 @@ if __name__ == "__main__":
     stations_queue = pika.declare_queue(f"MONTREAL_stations_filter_{ID_FILTER}")
     trips_queue = pika.declare_queue("MONTREAL_montreal_trips")
     stations_average_queue = pika.declare_queue("MONTREAL_stations_average")
-    gc = GracefulKiller(pika)
+    # gc = GracefulKiller(pika)
     filter = Filter(pika)
     try:
         filter.run(trips_queue, stations_queue)
