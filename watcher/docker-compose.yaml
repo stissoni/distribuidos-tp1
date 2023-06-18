@@ -1,0 +1,66 @@
+version: '3'
+services:
+
+  watcher_1:
+    build:
+      context: ./watcher
+      dockerfile: Dockerfile
+    restart: on-failure
+    links:
+      - watcher_2
+      - watcher_3
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID=1
+    volumes:
+      - ./watcher/main.py:/app/watcher/main.py
+
+  watcher_2:
+    build:
+      context: ./watcher
+      dockerfile: Dockerfile
+    restart: on-failure
+    links:
+      - watcher_1
+      - watcher_3
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID=2
+    volumes:
+      - ./watcher/main.py:/app/watcher/main.py
+
+  watcher_3:
+    build:
+      context: ./watcher
+      dockerfile: Dockerfile
+    restart: on-failure
+    links:
+      - watcher_1
+      - watcher_2
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ID=3
+    volumes:
+      - ./watcher/main.py:/app/watcher/main.py
+
+  # test_process_1:
+  #   build:
+  #     context: ./test_process
+  #     dockerfile: Dockerfile
+  #   restart: on-failure
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - ID=1
+  #   volumes:
+  #     - ./test_process/main.py:/app/test_process/main.py
+
+  # test_process_2:
+  #   build:
+  #     context: ./test_process
+  #     dockerfile: Dockerfile
+  #   restart: on-failure
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #     - ID=2
+  #   volumes:
+  #     - ./test_process/main.py:/app/test_process/main.py
